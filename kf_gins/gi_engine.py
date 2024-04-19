@@ -78,7 +78,9 @@ class GIEngine:
         self.pvacur_.pos = initstate.pos
         self.pvacur_.vel = initstate.vel
         self.pvacur_.att.euler = initstate.euler
+        # print('self.pvacur_.att.euler init', self.pvacur_.att.euler) # todo:
         self.pvacur_.att.cbn = Rotation.euler2matrix(self.pvacur_.att.euler)
+        # print('self.pvacur_.att.cbn init',self.pvacur_.att.cbn)
         self.pvacur_.att.qbn = Rotation.euler2quaternion(self.pvacur_.att.euler)
 
         # Initialize IMU error
@@ -109,11 +111,11 @@ class GIEngine:
 
         # If GNSS is valid, set update time as the GNSS time
         updatetime = self.gnssdata_.time if self.gnssdata_.isvalid else -1
-        print('updatetime: ',updatetime)
+        # print('updatetime: ',updatetime)
         # Determine if GNSS update is needed
-        print('pre_: ',self.imupre_.time, 'cur_:', self.imucur_.time)
+        # print('pre_: ',self.imupre_.time, 'cur_:', self.imucur_.time)
         res = self.isToUpdate(self.imupre_.time, self.imucur_.time, updatetime)
-        print('res: ',res)
+        # print('res: ',res)
         if res == 0:
             # Only propagate navigation state
             self.insPropagation(self.imupre_, self.imucur_)
@@ -128,7 +130,7 @@ class GIEngine:
             self.insPropagation(self.imupre_, self.imucur_)
             self.gnssdata_ = self.gnssUpdate(self.gnssdata_)
             self.stateFeedback()
-        else:
+        elif res == 3:
             # GNSS data is between the two imudata, we interpolate current imudata to gnss time
             midimu = IMU()  # Define midimu as needed
             midimu, self.imucur_ = self.imuInterpolate(self.imupre_, self.imucur_, updatetime, midimu)
@@ -163,15 +165,23 @@ class GIEngine:
         self.imupre_.odovel = self.imucur_.odovel
 
     def imuCompensate(self, imu: IMU):
+        # imunew = imu
+        imunew = IMU()
+        imunew.time = imu.time
+        imunew.dt = imu.dt
+        imunew.dtheta = imu.dtheta
+        imunew.dvel = imu.dvel
+        imunew.odovel = imu.odovel
+
+
         # Compensate the IMU bias
-        imu.dtheta -= self.imuerror_.gyrbias * imu.dt
-        imu.dvel -= self.imuerror_.accbias * imu.dt
+        imunew.dtheta -= self.imuerror_.gyrbias * imu.dt
+        imunew.dvel -= self.imuerror_.accbias * imu.dt
 
         # Compensate the IMU scale
         gyrscale = np.ones(3) + self.imuerror_.gyrscale
         accscale = np.ones(3) + self.imuerror_.accscale
 
-        imunew = imu
         imunew.dtheta *= gyrscale ** -1
         imunew.dvel *= accscale ** -1
         return imunew
@@ -181,7 +191,9 @@ class GIEngine:
         imucur = self.imuCompensate(imucur)
 
         # Update IMU state (mechanization)
+        # print('pvacru_ vel before insmech:', self.pvacur_.vel, self.pvapre_.vel)
         self.pvacur_ = INSMech.insMech(self.pvapre_, self.pvacur_, imupre, imucur)
+        # print('pvacru_ vel after insmech:', self.pvacur_.vel, self.pvapre_.vel)
 
         # System noise propagate, phi-angle error model for attitude error
         Phi = np.zeros_like(self.Cov_)
@@ -301,11 +313,18 @@ class GIEngine:
         self.EKFUpdate(dz, H_gnsspos, R_gnsspos)
 
         # Set GNSS invalid after update
-        gnssdatanew = gnssdata
+        # gnssdatanew = gnssdata
+        gnssdatanew = GNSS()
+        gnssdatanew.time = gnssdata.time
+        gnssdatanew.blh = gnssdata.blh
+        gnssdatanew.std = gnssdata.std
+        gnssdatanew.isvalid = gnssdata.isvalid
+
         gnssdatanew.isvalid = False
         return gnssdatanew
 
     def isToUpdate(self, imutime1: float, imutime2: float, updatetime: float):
+        # print(imutime1,imutime2,updatetime,abs(imutime2 - updatetime))
         if abs(imutime1 - updatetime) < self.TIME_ALIGN_ERR:
             return 1  # updatetime is near to imutime1
         elif abs(imutime2 - updatetime) <= self.TIME_ALIGN_ERR:
@@ -438,17 +457,25 @@ class GIEngine:
         """
 
         if imu1.time > timestamp or imu2.time < timestamp:
-            return midimu
+            return midimu, imu2
 
         lamda = (timestamp - imu1.time) / (imu2.time - imu1.time)
 
-        mid = midimu
+        mid = IMU()
         mid.time = timestamp
         mid.dtheta = imu2.dtheta * lamda
         mid.dvel = imu2.dvel * lamda
         mid.dt = timestamp - imu1.time
+        mid.odovel = midimu.odovel
 
-        imu2new = imu2
+        # imu2new = imu2
+        imu2new = IMU()
+        imu2new.time = imu2.time
+        imu2new.dt = imu2.dt
+        imu2new.dtheta = imu2.dtheta
+        imu2new.dvel = imu2.dvel
+        imu2new.odovel = imu2.odovel
+
         imu2new.dtheta -= mid.dtheta
         imu2new.dvel -= mid.dvel
         imu2new.dt -= mid.dt
