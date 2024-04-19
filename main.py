@@ -1,18 +1,22 @@
 import sys
+
+import numpy as np
 from absl import logging
+import matplotlib.pyplot as plt
 import time
 
 import yaml
 from common.angle import *
 from fileio.imufileloader import *
 from fileio.gnssfileloader import *
+from fileio.filesaver import *
 
 from kf_gins.gi_engine import *
 
 def main():
     # --------------------------------------------------------------------------------------------- open files
     # if len(argv) != 2:
-    #     print("usage: python script.py kf-gins.yaml")
+    #     print("usage: python script.py kf-gins-real.yaml")
     #     sys.exit(-1)
 
     print("\nKF-GINS: An EKF-Based GNSS/INS Integrated Navigation System\n")
@@ -20,15 +24,15 @@ def main():
 
     # Load configuration file
     try:
-        with open('kf-gins.yaml', 'r', encoding='utf-8') as file: # argv[1]
+        with open('kf-gins-real.yaml', 'r', encoding='utf-8') as file: # argv[1]
             config = yaml.safe_load(file)
     except Exception as e:
         print("Failed to read configuration file. Please check the path and format of the configuration file!")
         sys.exit(-1)
 
     # Read configuration parameters into GINSOptions and construct GIEngine
-    options = GINSOptions()
-    judge, options = loadConfig(config, options)
+    # options = GINSOptions()
+    judge, opt = loadConfig(config)
     if not judge:
         print("Error occurs in the configuration file!")
         sys.exit(-1)
@@ -59,14 +63,14 @@ def main():
     #  ---------------------------------------------------------------------- file opened
 
     #  ---------------------------------------------------------------------- load into GIEngine
-    giengine = GIEngine(options)
+    giengine = GIEngine(opt)
 
     nav_columns = 11
     imuerr_columns = 13
     std_columns = 22
-    # navfile = FileSaver(outputpath + "/KF_GINS_Navresult.nav", nav_columns, FileSaver.TEXT)
-    # imuerrfile = FileSaver(outputpath + "/KF_GINS_IMU_ERR.txt", imuerr_columns, FileSaver.TEXT)
-    # stdfile = FileSaver(outputpath + "/KF_GINS_STD.txt", std_columns, FileSaver.TEXT)
+    navfile = FileSaver(outputpath + "/KF_GINS_Navresult.nav", nav_columns, FileSaver.TEXT)
+    imuerrfile = FileSaver(outputpath + "/KF_GINS_IMU_ERR.txt", imuerr_columns, FileSaver.TEXT)
+    stdfile = FileSaver(outputpath + "/KF_GINS_STD.txt", std_columns, FileSaver.TEXT)
 
     # Check if files are opened
     if not (gnssfile.isOpen() and imufile.isOpen() ): # and navfile.isOpen() and imuerrfile.isOpen() and stdfile.isOpen()
@@ -108,6 +112,17 @@ def main():
     lastpercent = 0
     interval = endtime - starttime
 
+    # todo: --------------------
+    plt.figure()
+    plt.axis('equal')
+    plt.grid(True)
+    plt.title('test plot')
+    plt.xlabel('pos0')
+    plt.ylabel('pos1')
+    pos0 = []
+    pos1 = []
+    # todo: --------------------
+
     while True:
         # Load new gnssdata when current state time is newer than GNSS time and add it to GIEngine
         if gnss.time < imu_cur.time and not gnssfile.isEof():
@@ -121,19 +136,29 @@ def main():
             break
         giengine.addImuData(imu_cur)
 
-
         # Process new imudata
+        # print('pvacru_ pos before newimuprocess:', giengine.pvacur_.pos * Angle.R2D, giengine.pvapre_.pos * Angle.R2D)
         giengine.newImuProcess()
+        # print('pvacru_ pos after newimuprocess:', giengine.pvacur_.pos * Angle.R2D, giengine.pvapre_.pos * Angle.R2D)
 
         # Get current timestamp, navigation state, and covariance
         timestamp = giengine.timestamp()
         navstate = giengine.getNavState()
         cov = giengine.getCovariance()
 
+        # todo: --------------------
+        tmp = np.zeros((3,))
+        tmp[0] = navstate.pos[0] * Angle.R2D
+        tmp[1] = navstate.pos[1] * Angle.R2D
+        tmp[2] = navstate.pos[2]
+        temp = Earth.blh2ecef(tmp)
+        pos0.append(temp[0])
+        pos1.append(temp[1])
+        # todo: --------------------
 
         # Save processing results
-        # writeNavResult(timestamp, navstate, navfile, imuerrfile)
-        # writeSTD(timestamp, cov, stdfile)
+        writeNavResult(timestamp, navstate, navfile, imuerrfile)
+        writeSTD(timestamp, cov, stdfile)
 
         # Display processing progress
         percent = int((imu_cur.time - starttime) / interval * 100)
@@ -141,25 +166,36 @@ def main():
             print(f" - Processing: {percent:3d}%", end='\r', flush=True)
             lastpercent = percent
 
+
     # Close opened files
     imufile.close()
     gnssfile.close()
-    # navfile.close()
-    # imuerrfile.close()
-    # stdfile.close()
+    navfile.close()
+    imuerrfile.close()
+    stdfile.close()
 
     te = time.time()
     print(f"\n\nKF-GINS Process Finish! From {starttime} s to {endtime} s, total {interval} s!")
     print(f"Cost {te - ts} s in total")
+
+    # todo: --------------------
+    plt.plot(pos0, pos1, color='b', linestyle='-')
+    plt.show()
+    # todo: --------------------
+
     #  ---------------------------------------------------------------------- loaded in
 
 
-def loadConfig(config, optionin):
+def loadConfig(config):
     """
     Load initial states of GIEngine from configuration file and convert them to standard units.
     """
     # Constants for unit conversions
     D2R = Angle.D2R
+
+    # initstate = NavState()
+    # initstate_std = NavState()
+
     options = GINSOptions()
     # Load initial position, velocity, and attitude from configuration file
     try:
@@ -207,6 +243,8 @@ def loadConfig(config, optionin):
         options.initstate_std.vel[i] = vec2[i]
         options.initstate_std.euler[i] = vec3[i] * D2R
 
+
+
     # Load IMU noise parameters from configuration file
     try:
         vec1 = config["imunoise"]["arw"]
@@ -233,22 +271,22 @@ def loadConfig(config, optionin):
     try:
         vec1 = config["initbgstd"]
     except KeyError:
-        vec1 = [optionin.imunoise.gyrbias_std[0], optionin.imunoise.gyrbias_std[1], optionin.imunoise.gyrbias_std[2]]
+        vec1 = [options.imunoise.gyrbias_std[0], options.imunoise.gyrbias_std[1], options.imunoise.gyrbias_std[2]]
 
     try:
         vec2 = config["initbastd"]
     except KeyError:
-        vec2 = [optionin.imunoise.accbias_std[0], optionin.imunoise.accbias_std[1], optionin.imunoise.accbias_std[2]]
+        vec2 = [options.imunoise.accbias_std[0], options.imunoise.accbias_std[1], options.imunoise.accbias_std[2]]
 
     try:
         vec3 = config["initsgstd"]
     except KeyError:
-        vec3 = [optionin.imunoise.gyrscale_std[0], optionin.imunoise.gyrscale_std[1], optionin.imunoise.gyrscale_std[2]]
+        vec3 = [options.imunoise.gyrscale_std[0], options.imunoise.gyrscale_std[1], options.imunoise.gyrscale_std[2]]
 
     try:
         vec4 = config["initsastd"]
     except KeyError:
-        vec4 = [optionin.imunoise.accscale_std[0], optionin.imunoise.accscale_std[1], optionin.imunoise.accscale_std[2]]
+        vec4 = [options.imunoise.accscale_std[0], options.imunoise.accscale_std[1], options.imunoise.accscale_std[2]]
 
     for i in range(3):
         options.initstate_std.imuerror.gyrbias[i] = vec1[i] * D2R / 3600.0
@@ -272,79 +310,80 @@ def loadConfig(config, optionin):
         print("Failed when loading configuration. Please check antenna leverarm!")
         return False
 
-    options.antlever = np.array(vec1)
 
+    options.antlever = np.array(vec1)
     return True, options
 
-# def writeNavResult(time: float, navstate: NavState, navfile: FileSaver, imuerrfile: FileSaver):
-#     """
-#     Save navigation result and IMU error.
-#     """
-#     # Constants for unit conversions
-#     R2D = Angle.R2D
-#
-#     # Save navigation result
-#     result = [
-#         0,
-#         time,
-#         navstate.pos[0] * R2D,
-#         navstate.pos[1] * R2D,
-#         navstate.pos[2],
-#         navstate.vel[0],
-#         navstate.vel[1],
-#         navstate.vel[2],
-#         navstate.euler[0] * R2D,
-#         navstate.euler[1] * R2D,
-#         navstate.euler[2] * R2D
-#     ]
-#     navfile.dump(result)
-#
-#     # Save IMU error
-#     imuerr = navstate.imuerror
-#     result = [
-#         time,
-#         imuerr.gyrbias[0] * R2D * 3600,
-#         imuerr.gyrbias[1] * R2D * 3600,
-#         imuerr.gyrbias[2] * R2D * 3600,
-#         imuerr.accbias[0] * 1e5,
-#         imuerr.accbias[1] * 1e5,
-#         imuerr.accbias[2] * 1e5,
-#         imuerr.gyrscale[0] * 1e6,
-#         imuerr.gyrscale[1] * 1e6,
-#         imuerr.gyrscale[2] * 1e6,
-#         imuerr.accscale[0] * 1e6,
-#         imuerr.accscale[1] * 1e6,
-#         imuerr.accscale[2] * 1e6
-#     ]
-#     imuerrfile.dump(result)
+def writeNavResult(time: float, navstate: NavState, navfile: FileSaver, imuerrfile: FileSaver):
+    """
+    Save navigation result and IMU error.
+    """
+    # Constants for unit conversions
+    R2D = Angle.R2D
 
-# def writeSTD(time, cov, stdfile):
-#     """
-#     Save standard deviation, converted to common units.
-#     """
-#     # Constants for unit conversions
-#     R2D = Angle.R2D
-#
-#     result = [time]
-#
-#     # Save position, velocity, and attitude std
-#     for i in range(6):
-#         result.append(np.sqrt(cov[i, i]))
-#
-#     for i in range(6, 9):
-#         result.append(np.sqrt(cov[i, i]) * R2D)
-#
-#     # Save IMU error std
-#     for i in range(9, 12):
-#         result.append(np.sqrt(cov[i, i]) * R2D * 3600)
-#
-#     for i in range(12, 15):
-#         result.append(np.sqrt(cov[i, i]) * 1e5)
-#
-#     for i in range(15, 21):
-#         result.append(np.sqrt(cov[i, i]) * 1e6)
-#
-#     stdfile.dump(result)
+    # Save navigation result
+    result = [
+        0,
+        format(round(time, 9), '.9f'),  # Round time to nine decimal places
+        format(round(navstate.pos[0] * R2D, 9), '.9f'),  # Round position coordinates to nine decimal places
+        format(round(navstate.pos[1] * R2D, 9), '.9f'),
+        format(round(navstate.pos[2], 9), '.9f'),
+        format(round(navstate.vel[0], 9), '.9f'),  # Round velocity components to nine decimal places
+        format(round(navstate.vel[1], 9), '.9f'),
+        format(round(navstate.vel[2], 9), '.9f'),
+        format(round(navstate.euler[0] * R2D, 9), '.9f'),  # Round Euler angles to nine decimal places
+        format(round(navstate.euler[1] * R2D, 9), '.9f'),
+        format(round(navstate.euler[2] * R2D, 9), '.9f')
+    ]
+    navfile.dump(result)
+
+    # Save IMU error
+    imuerr = navstate.imuerror
+    result = [
+        format(round(time, 9), '.9f'),
+        # Round time to nine decimal places and format as a string with nine decimal places
+        format(round(imuerr.gyrbias[0] * R2D * 3600, 9), '.9f'),  # Round and format gyrbias components
+        format(round(imuerr.gyrbias[1] * R2D * 3600, 9), '.9f'),
+        format(round(imuerr.gyrbias[2] * R2D * 3600, 9), '.9f'),
+        format(round(imuerr.accbias[0] * 1e5, 9), '.9f'),  # Round and format accbias components
+        format(round(imuerr.accbias[1] * 1e5, 9), '.9f'),
+        format(round(imuerr.accbias[2] * 1e5, 9), '.9f'),
+        format(round(imuerr.gyrscale[0] * 1e6, 9), '.9f'),  # Round and format gyrscale components
+        format(round(imuerr.gyrscale[1] * 1e6, 9), '.9f'),
+        format(round(imuerr.gyrscale[2] * 1e6, 9), '.9f'),
+        format(round(imuerr.accscale[0] * 1e6, 9), '.9f'),  # Round and format accscale components
+        format(round(imuerr.accscale[1] * 1e6, 9), '.9f'),
+        format(round(imuerr.accscale[2] * 1e6, 9), '.9f')
+    ]
+    imuerrfile.dump(result)
+
+def writeSTD(time, cov, stdfile):
+    """
+    Save standard deviation, converted to common units.
+    """
+    # Constants for unit conversions
+    R2D = Angle.R2D
+
+    result = [time]
+
+    # Save position, velocity, and attitude std
+    for i in range(6):
+        result.append(np.sqrt(cov[i, i]))
+
+    for i in range(6, 9):
+        result.append(np.sqrt(cov[i, i]) * R2D)
+
+    # Save IMU error std
+    for i in range(9, 12):
+        result.append(np.sqrt(cov[i, i]) * R2D * 3600)
+
+    for i in range(12, 15):
+        result.append(np.sqrt(cov[i, i]) * 1e5)
+
+    for i in range(15, 21):
+        result.append(np.sqrt(cov[i, i]) * 1e6)
+
+    stdfile.dump(result)
 
 
 if __name__ == '__main__':

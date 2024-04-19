@@ -3,71 +3,47 @@ import numpy as np
 from pyquaternion import Quaternion
 
 class Attitude:
-    def __init__(self, qbn: Quaternion = Quaternion(0,0,0,0), cbn: np.ndarray = np.zeros((3,3)), euler: np.ndarray = np.zeros((3,))):
-        self.qbn = qbn
-        self.cbn = cbn
-        self.euler = euler
+    def __init__(self):
+        self.qbn = Quaternion(0,0,0,0)
+        self.cbn = np.zeros((3,3))
+        self.euler = np.zeros((3,))
 
 class PVA:
-    def __init__(self, pos: np.ndarray = np.zeros((3,)), vel: np.ndarray = np.zeros((3,)), att: Attitude = Attitude()):
-        self.pos = pos
-        self.vel = vel
-        self.att = att
-
-    # def __init__(self):
-    #     self.pos = None
-    #     self.vel = None
-    #     self.att = None
+    def __init__(self):
+        self.pos = np.zeros((3,))
+        self.vel = np.zeros((3,))
+        self.att = Attitude()
 
 class ImuError:
-    def __init__(self, gyrbias: np.ndarray = np.zeros((3,)), accbias: np.ndarray = np.zeros((3,)), gyrscale: np.ndarray = np.zeros((3,)), accscale: np.ndarray = np.zeros((3,))):
-        self.gyrbias = gyrbias
-        self.accbias = accbias
-        self.gyrscale = gyrscale
-        self.accscale = accscale
-
-    # def __init__(self):
-    #     self.gyrbias = None
-    #     self.accbias = None
-    #     self.gyrscale = None
-    #     self.accscale = None
+    def __init__(self):
+        self.gyrbias = np.zeros((3,))
+        self.accbias = np.zeros((3,))
+        self.gyrscale = np.zeros((3,))
+        self.accscale = np.zeros((3,))
 
 class NavState:
-    def __init__(self, pos: np.ndarray = np.zeros((3,)), vel: np.ndarray = np.zeros((3,)), euler: np.ndarray = np.zeros((3,)), imuerror: ImuError = ImuError()):
-        self.pos = pos
-        self.vel = vel
-        self.euler = euler
-        self.imuerror = imuerror
-
-    # def __init__(self):
-    #     self.pos = None
-    #     self.vel = None
-    #     self.euler = None
-    #     self.imuerror = None
+    def __init__(self):
+        self.pos = np.zeros((3,))
+        self.vel = np.zeros((3,))
+        self.euler = np.zeros((3,))
+        self.imuerror = ImuError()
 
 class ImuNoise:
-    def __init__(self, gyr_arw: np.ndarray = np.zeros((3,)), acc_vrw: np.ndarray = np.zeros((3,)), gyrbias_std: np.ndarray = np.zeros((3,)),
-                 accbias_std: np.ndarray = np.zeros((3,)), gyrscale_std: np.ndarray = np.zeros((3,)), accscale_std: np.ndarray = np.zeros((3,)), corr_time: float = 0.0):
-        self.gyr_arw = gyr_arw
-        self.acc_vrw = acc_vrw
-        self.gyrbias_std = gyrbias_std
-        self.accbias_std = accbias_std
-        self.gyrscale_std = gyrscale_std
-        self.accscale_std = accscale_std
-        self.corr_time = corr_time
+    def __init__(self):
+        self.gyr_arw = np.zeros((3,))
+        self.acc_vrw = np.zeros((3,))
+        self.gyrbias_std = np.zeros((3,))
+        self.accbias_std = np.zeros((3,))
+        self.gyrscale_std = np.zeros((3,))
+        self.accscale_std = np.zeros((3,))
+        self.corr_time = 0.0
 
 class GINSOptions:
-    def __init__(self, initstate: NavState = NavState(), initstate_std: NavState = NavState(), imunoise: ImuNoise = ImuNoise(), antlever: np.ndarray = np.zeros((3,))):
-        self.initstate = initstate
-        self.initstate_std = initstate_std
-        self.imunoise = imunoise
-        self.antlever = antlever
-
-    # def __init__(self):
-    #     self.initstate = None
-    #     self.initstate_std = None
-    #     self.imunoise = None
-    #     self.antlever = np.array([0,0,0])
+    def __init__(self):
+        self.initstate = NavState()
+        self.initstate_std = NavState()
+        self.imunoise = ImuNoise()
+        self.antlever = np.zeros((3,))
 
     def print_options(self):
         print("---------------KF-GINS Options:---------------")
