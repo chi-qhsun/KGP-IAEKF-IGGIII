@@ -10,7 +10,7 @@ gnsspath: "dataset/GNSS-RTK.txt"
 
 # 输出文件夹路径
 # output folder path
-outputpath: "dataset"
+outputpath: "new"
 
 # IMU文件列数 (只会用前7列IMU数据)
 # IMU data columns, only use the first seven columns
@@ -29,7 +29,7 @@ endtime: -1 # IMU end
 # initial state
 # 初始位置, 纬度 经度 高程
 # initial position, latitude, longitude, altitude. [deg, deg, m]
-initpos: [ 30.5, 114, 20 ]
+initpos: [ 30.4447873701, 114.4718632047, 20.899 ]
 
 # 初始速度, 北向速度, 东向速度, 垂向速度
 # initial velocity, speed in the directions of north, east and down. [m/s, m/s, m/s]

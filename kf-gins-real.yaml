@@ -1,0 +1,42 @@
+imupath: "dataset/Leador-A15.txt"
+gnsspath: "dataset/GNSS-RTK.txt"
+
+outputpath: "new"
+
+imudatalen: 7
+
+imudatarate: 200
+
+starttime: 456300
+endtime: -1
+
+initpos: [ 30.4447873701, 114.4718632047, 20.899 ]
+
+initvel: [ 0.0, 0.0, 0.0 ]
+
+initatt: [ 0.85421502, -2.03480295, 185.70235133 ]
+
+initgyrbias: [ 0, 0, 0 ]
+initaccbias: [ 0, 0, 0 ]
+initgyrscale: [ 0, 0, 0 ]
+initaccscale: [ 0, 0, 0 ]
+
+
+initposstd: [ 0.005, 0.004, 0.008 ]
+
+
+initvelstd: [ 0.003, 0.004, 0.004 ]
+
+
+initattstd: [ 0.003, 0.003, 0.023 ]
+
+imunoise:
+  arw: [0.003, 0.003, 0.003]
+  vrw: [0.03, 0.03, 0.03]
+  gbstd: [0.027, 0.027, 0.027]
+  abstd: [15.0, 15.0, 15.0]
+  gsstd: [300.0, 300.0, 300.0]
+  asstd: [300.0, 300.0, 300.0]
+  corrtime: 4.0
+
+antlever:  [ 0.136, -0.301, -0.184 ]
