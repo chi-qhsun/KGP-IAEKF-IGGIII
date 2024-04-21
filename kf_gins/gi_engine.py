@@ -1,9 +1,8 @@
 from common.types import *
-from .kf_gins_types import *
-
 from common.earth import *
 from common.rotation import *
 from .insmech import *
+from .KGP import *
 import numpy as np
 import sys
 
@@ -27,20 +26,15 @@ class GIEngine:
 
     def __init__(self, options: GINSOptions):
 
-
-
-        # 更新时间对齐误差，IMU状态和观测信息误差小于它则认为两者对齐
         # updata time align error
         self.TIME_ALIGN_ERR = 0.001
 
-        # IMU和GNSS原始数据
         # raw imudata and gnssdata
         self.imupre_ = IMU()
         self.imucur_ = IMU()
         self.gnssdata_ = GNSS()
 
-        # # IMU状态（位置、速度、姿态和IMU误差）
-        # # imu state (position, velocity, attitude and imu error)
+        # imu state (position, velocity, attitude and imu error)
         self.pvacur_ = PVA()
         self.pvapre_ = PVA()
         self.imuerror_ = ImuError()
@@ -53,10 +47,27 @@ class GIEngine:
         self.options_.print_options()
         self.timestamp_ = 0
 
-        # Resize covariance matrix, system noise matrix, and system error state matrix
+        # init covariance matrix, system noise matrix, and system error state matrix
         self.Cov_ = np.zeros((self.RANK, self.RANK))
         self.Qc_ = np.zeros((self.NOISERANK, self.NOISERANK))
         self.dx_ = np.zeros((self.RANK, 1))
+
+        self.v2 = []
+
+        self.N = 30
+
+        self.C = None
+        self.C_ori = None
+
+        self.Chi_alpha1 = 2.706	 # alpha = 0.01
+        self.Chi_alpha2 = 7.879  # alpha = 0.005
+        self.Chi_alpha3 = 1000
+
+        self.IG3 = True
+
+        # KGP
+        self.KGP = KGP()
+        self.kgp_status = options.kgp_status
 
         # Initialize noise matrix
         imunoise = self.options_.imunoise
@@ -74,20 +85,16 @@ class GIEngine:
 
     def initialize(self, initstate: NavState, initstate_std: NavState):
         # Initialize position, velocity, and attitude
-        # self.pvacur_ = PVA()
         self.pvacur_.pos = initstate.pos
         self.pvacur_.vel = initstate.vel
         self.pvacur_.att.euler = initstate.euler
-        # print('self.pvacur_.att.euler init', self.pvacur_.att.euler) # todo:
         self.pvacur_.att.cbn = Rotation.euler2matrix(self.pvacur_.att.euler)
-        # print('self.pvacur_.att.cbn init',self.pvacur_.att.cbn)
         self.pvacur_.att.qbn = Rotation.euler2quaternion(self.pvacur_.att.euler)
 
         # Initialize IMU error
         self.imuerror_ = initstate.imuerror
 
         # Set the same value to the previous state
-        # self.pvapre_ = self.pvacur_
         self.pvapre_.pos = self.pvacur_.pos
         self.pvapre_.vel = self.pvacur_.vel
         self.pvapre_.att.euler = self.pvacur_.att.euler
@@ -111,11 +118,10 @@ class GIEngine:
 
         # If GNSS is valid, set update time as the GNSS time
         updatetime = self.gnssdata_.time if self.gnssdata_.isvalid else -1
-        # print('updatetime: ',updatetime)
+
         # Determine if GNSS update is needed
-        # print('pre_: ',self.imupre_.time, 'cur_:', self.imucur_.time)
         res = self.isToUpdate(self.imupre_.time, self.imucur_.time, updatetime)
-        # print('res: ',res)
+
         if res == 0:
             # Only propagate navigation state
             self.insPropagation(self.imupre_, self.imucur_)
@@ -130,6 +136,7 @@ class GIEngine:
             self.insPropagation(self.imupre_, self.imucur_)
             self.gnssdata_ = self.gnssUpdate(self.gnssdata_)
             self.stateFeedback()
+
         elif res == 3:
             # GNSS data is between the two imudata, we interpolate current imudata to gnss time
             midimu = IMU()  # Define midimu as needed
@@ -146,18 +153,31 @@ class GIEngine:
             self.pvapre_ = self.pvacur_
             self.insPropagation(midimu, self.imucur_)
 
-            # Check diagonal elements of current covariance matrix
+
+
+        if self.kgp_status:
+            X = np.concatenate((self.imucur_.dtheta, self.imucur_.dvel))  # input KGP vec(6:)
+            delta_P = self.pvacur_.pos - self.pvapre_.pos
+            Y = delta_P[:2]  # label vec(2:)
+            if self.KGP.Add_x_y(X, Y):  # True -> stop adding data
+                self.KGP.triger_KGP()
+                self.IG3 = False
+                KGP_input_cur = np.concatenate((self.imucur_.dtheta, self.imucur_.dvel))
+                KGP_input_cur = KGP_input_cur.reshape(1, -1)
+                v = self.KGP.GBDT_model.predict(KGP_input_cur)
+                self.pvacur_.pos[0] += v[0, 0]
+                self.pvacur_.pos[1] += v[0, 1]
+        "---------------------"
+        # Check diagonal elements of current covariance matrix
         self.checkCov()
 
         # Update system state and imudata at the previous epoch
-        # self.pvapre_ = self.pvacur_
         self.pvapre_.pos = self.pvacur_.pos
         self.pvapre_.vel = self.pvacur_.vel
         self.pvapre_.att.euler = self.pvacur_.att.euler
         self.pvapre_.att.cbn = self.pvacur_.att.cbn
         self.pvapre_.att.qbn = self.pvacur_.att.qbn
 
-        # self.imupre_ = self.imucur_
         self.imupre_.time = self.imucur_.time
         self.imupre_.dt = self.imucur_.dt
         self.imupre_.dtheta = self.imucur_.dtheta
@@ -191,9 +211,7 @@ class GIEngine:
         imucur = self.imuCompensate(imucur)
 
         # Update IMU state (mechanization)
-        # print('pvacru_ vel before insmech:', self.pvacur_.vel, self.pvapre_.vel)
         self.pvacur_ = INSMech.insMech(self.pvapre_, self.pvacur_, imupre, imucur)
-        # print('pvacru_ vel after insmech:', self.pvacur_.vel, self.pvapre_.vel)
 
         # System noise propagate, phi-angle error model for attitude error
         Phi = np.zeros_like(self.Cov_)
@@ -283,14 +301,14 @@ class GIEngine:
         G[GIEngine.StateID.SA_ID:GIEngine.StateID.SA_ID + 3, GIEngine.NoiseID.SASTD_ID:GIEngine.NoiseID.SASTD_ID + 3] = np.eye(3)
 
         # Compute the state transition matrix
-        Phi = np.eye(Phi.shape[0]) + F * imucur.dt
+        self.Phi = np.eye(Phi.shape[0]) + F * imucur.dt
 
         # Compute system propagation noise
-        Qd = np.dot(G, np.dot(self.Qc_, np.dot(G.transpose(), imucur.dt)))
-        Qd = (np.dot(Phi, np.dot(Qd, Phi.transpose())) + Qd) / 2
+        self.Qd = np.dot(G, np.dot(self.Qc_, np.dot(G.transpose(), imucur.dt)))
+        self.Qd = (np.dot(Phi, np.dot(self.Qd, Phi.transpose())) + self.Qd) / 2
 
         # Do EKF predict to propagate covariance and error state
-        self.EKFPredict(Phi, Qd)
+        self.EKFPredict(self.Phi, self.Qd)
 
     def gnssUpdate(self, gnssdata: GNSS):
         # Convert IMU position to GNSS antenna phase center position
@@ -324,7 +342,6 @@ class GIEngine:
         return gnssdatanew
 
     def isToUpdate(self, imutime1: float, imutime2: float, updatetime: float):
-        # print(imutime1,imutime2,updatetime,abs(imutime2 - updatetime))
         if abs(imutime1 - updatetime) < self.TIME_ALIGN_ERR:
             return 1  # updatetime is near to imutime1
         elif abs(imutime2 - updatetime) <= self.TIME_ALIGN_ERR:
@@ -349,8 +366,37 @@ class GIEngine:
         assert dz.shape[1] == 1
 
         # Compute Kalman Gain
-        temp = H @ self.Cov_ @ H.T + R
-        K = self.Cov_ @ H.T @ np.linalg.inv(temp)
+        original = H @ self.Cov_ @ H.T + R
+        if self.C is None:
+            self.C = original
+            self.C_ori = original
+
+
+        if self.IG3:
+            v = dz - H @ self.dx_
+            v2 = np.diag((v**2).reshape((3,)))
+
+            # IGGIII
+            M2 = v.T @ self.C @ v
+            if M2 <= self.Chi_alpha1:
+                N_hat = len(self.v2)+1
+            elif self.Chi_alpha1 < M2 <= self.Chi_alpha2:
+                N_hat = int(self.N * M2 / self.Chi_alpha2)
+            else:
+                N_hat = 1
+
+            self.v2.append(v2)
+
+            if len(self.v2) <= N_hat:
+                # recursive with initial
+                self.C += self.v2[-1] / len(self.v2)
+            else:
+                # avg with initial
+                self.C = self.C_ori + np.sum(self.v2[-N_hat:], axis=0) / N_hat
+        else:
+            self.C = original
+
+        K = self.Cov_ @ H.T @ np.linalg.inv(self.C)
 
         # update system error state and covariance
         I = np.identity(self.Cov_.shape[0])
@@ -400,25 +446,14 @@ class GIEngine:
         return state
 
     def addImuData(self, imu: IMU, compensate=False):
-        """
-        Add new imudata and optionally compensate imu error.
 
-        Args:
-        imu (IMU): New raw imudata.
-        compensate (bool, optional): Whether to compensate imu error to new imudata. Defaults to False.
-        """
-        # tmp = self.imucur_
-        # self.imucur_ = None
-        # self.imupre_ = tmp
+        # Add new imudata and optionally compensate imu error.
         self.imupre_.time = self.imucur_.time
         self.imupre_.dt = self.imucur_.dt
         self.imupre_.dtheta = self.imucur_.dtheta
         self.imupre_.dvel = self.imucur_.dvel
         self.imupre_.odovel = self.imucur_.odovel
 
-        # tmp = imu
-        # imu = None
-        # self.imucur_ = tmp
         self.imucur_.time = imu.time
         self.imucur_.dt = imu.dt
         self.imucur_.dtheta = imu.dtheta
@@ -430,12 +465,7 @@ class GIEngine:
             self.imucur_ = self.imuCompensate(self.imucur_)
 
     def addGnssData(self, gnss: GNSS):
-        """
-        Add new gnssdata.
-
-        Args:
-        gnss (GNSS): New gnssdata.
-        """
+        # Add new gnssdata.
         self.gnssdata_.time = gnss.time
 
         self.gnssdata_.blh = gnss.blh
@@ -445,16 +475,7 @@ class GIEngine:
         self.gnssdata_.isvalid = True
 
     def imuInterpolate(self, imu1: IMU, imu2: IMU, timestamp:float, midimu: IMU):
-        """
-        Interpolate incremental imudata to given timestamp.
-
-        Args:
-        imu1 (IMU): The previous imudata.
-        imu2 (IMU): The current imudata.
-        timestamp (float): Given interpolate timestamp.
-        Returns:
-        IMU: Output imudata at given timestamp.
-        """
+        # Interpolate incremental imudata to given timestamp.
 
         if imu1.time > timestamp or imu2.time < timestamp:
             return midimu, imu2
@@ -468,7 +489,6 @@ class GIEngine:
         mid.dt = timestamp - imu1.time
         mid.odovel = midimu.odovel
 
-        # imu2new = imu2
         imu2new = IMU()
         imu2new.time = imu2.time
         imu2new.dt = imu2.dt
@@ -483,28 +503,20 @@ class GIEngine:
         return mid,imu2new
 
     def timestamp(self):
-        """
-        Get current time.
-        """
+
+        # Get current time.
+
         return self.timestamp_
 
     def getCovariance(self):
-        """
-        Get the covariance matrix.
+        # Get the covariance matrix
 
-        Returns:
-        numpy.ndarray: The covariance matrix.
-        """
         # Assuming Cov_ is a NumPy array
         return self.Cov_
 
     def checkCov(self):
-        """
-        Check if covariance diagonal elements are all positive.
+        # Check if covariance diagonal elements are all positive.
 
-        Parameters:
-        Cov (numpy.ndarray): Covariance matrix.
-        """
         for i in range(self.RANK):
             if self.Cov_[i, i] < 0:
                 timestamp = self.timestamp_  # Assuming timestamp_ is a global variable

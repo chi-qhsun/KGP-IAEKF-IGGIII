@@ -1,27 +1,27 @@
 from .types import *
 import numpy as np
 import math
-from scipy.spatial.transform import Rotation as R
 from pyquaternion import Quaternion
 
 class Earth:
 
-    WGS84_WIE = 7.2921151467E-5  # 地球自转角速度
-    WGS84_F = 0.0033528106647474805  # 扁率
-    WGS84_RA = 6378137.0000000000  # 长半轴a
-    WGS84_RB = 6356752.3142451793  # 短半轴b
-    WGS84_GM0 = 398600441800000.00  # 地球引力常数
-    WGS84_E1 = 0.0066943799901413156  # 第一偏心率平方
-    WGS84_E2 = 0.0067394967422764341  # 第二偏心率平方
+    # earth constants
+    WGS84_WIE = 7.2921151467E-5
+    WGS84_F = 0.0033528106647474805
+    WGS84_RA = 6378137.0000000000
+    WGS84_RB = 6356752.3142451793
+    WGS84_GM0 = 398600441800000.00
+    WGS84_E1 = 0.0066943799901413156
+    WGS84_E2 = 0.0067394967422764341
 
-    # /* 正常重力计算 */
+    # gravity calculation
     @staticmethod
     def gravity(blh: np.ndarray):
         sin2 = np.sin(blh[0])
         sin2 *= sin2
         return 9.7803267715 * (1 + 0.0052790414 * sin2 + 0.0000232718 * sin2 * sin2) + blh[2] * (0.0000000043977311 * sin2 - 0.0000030876910891) + 0.0000000000007211 * blh[2] * blh[2]
 
-    # /* 计算子午圈半径和卯酉圈半径 */
+    # meridional radius and the prime vertical radius calculation
     @staticmethod
     def meridianPrimeVerticalRadius(lat: float):
         tmp = np.sin(lat)
@@ -30,13 +30,13 @@ class Earth:
         sqrttmp = np.sqrt(tmp)
         return np.array([Earth.WGS84_RA * (1 - Earth.WGS84_E1) / (sqrttmp * tmp), Earth.WGS84_RA / sqrttmp])
 
-    # /* 计算卯酉圈半径 */
+    # prime vertical radius calculation
     @staticmethod
     def RN(lat: float):
         sinlat = np.sin(lat)
         return Earth.WGS84_RA / np.sqrt(1.0 - Earth.WGS84_E1 * sinlat * sinlat)
 
-    # /* n系(导航坐标系)到e系(地心地固坐标系)转换矩阵 */
+    # transformation matrix from the NED (Navigation) frame to the ECEF (Earth-Centered, Earth-Fixed) frame
     @staticmethod
     def cne(blh: np.ndarray):
         sinlat = np.sin(blh[0])
@@ -59,7 +59,7 @@ class Earth:
 
         return dcm
 
-    # /* n系(导航坐标系)到e系(地心地固坐标系)转换四元数 */
+    # quaternion for transforming from the NED frame to the ECEF frame
     @staticmethod
     def qne(blh: np.ndarray):
         coslon = np.cos(blh[1] * 0.5)
@@ -75,12 +75,12 @@ class Earth:
         quat = Quaternion(w=w, x=x, y=y, z=z)
         return quat
 
-    # /* 从n系到e系转换四元数得到纬度和经度 */
+    # NED frame to the ECEF frame quaternion --> latitude and longitude
     @staticmethod
     def blh(qne: np.ndarray, height: float):
         return np.array([-2 * np.arctan(qne[2] / qne[0]) - math.pi * 0.5, 2 * np.arctan2(qne[3], qne[0]), height])  # 需要检查
 
-    # /* 大地坐标(纬度、经度和高程)转地心地固坐标 */
+    # conversion from geodetic coordinates (latitude, longitude, and altitude) to ECEF coordinates.
     @staticmethod
     def blh2ecef(blh: np.ndarray):
         coslat = np.cos(blh[0])
@@ -93,7 +93,7 @@ class Earth:
 
         return np.array([rnh * coslat * coslon, rnh * coslat * sinlon, (rnh - rn * Earth.WGS84_E1) * sinlat])
 
-    # /* 地心地固坐标转大地坐标 */
+    # conversion from ECEF to geodetic coordinates
     @staticmethod
     def ecef2blh(ecef: np.ndarray):
         p = np.sqrt(ecef[0] * ecef[0] + ecef[1] * ecef[1])
@@ -114,7 +114,7 @@ class Earth:
 
         return np.array([lat, lon, h])
 
-    # /* n系相对位置转大地坐标相对位置 */
+    # conversion from relative positions in NED frame to relative positions in geodetic coordinates
     @staticmethod
     def DRi(blh: np.ndarray):
         dri = np.zeros((3,3))
@@ -126,7 +126,7 @@ class Earth:
         dri[2, 2] = -1
         return dri
 
-    # /* 大地坐标相对位置转n系相对位置 */
+    # conversion from relative positions in geodetic coordinates to relative positions in NED frame
     @staticmethod
     def DR(blh: np.ndarray):
         dr = np.zeros((3,3))
@@ -138,7 +138,7 @@ class Earth:
         dr[2, 2] = -1
         return dr
 
-    # /* 局部坐标(在origin处展开)转大地坐标 */
+    # conversion from local coordinates (unfolded at the origin) to global coordinates
     @staticmethod
     def local2global(origin: np.ndarray, local: np.ndarray):
         ecef0 = Earth.blh2ecef(origin)
@@ -149,7 +149,7 @@ class Earth:
 
         return blh1
 
-    # /* 大地坐标转局部坐标(在origin处展开) */
+    # conversion from global coordinates to local coordinates (unfolded at the origin)
     @staticmethod
     def global2local(origin: np.ndarray, Global: np.ndarray):
         ecef0 = Earth.blh2ecef(origin)
@@ -184,12 +184,12 @@ class Earth:
 
         return local
 
-    # /* 地球自转角速度投影到e系 */
+    # projection of the angular velocity of Earth rotation onto the ECEF frame
     @staticmethod
     def iewe():
         return np.array([0, 0, Earth.WGS84_WIE])
 
-    # /* 地球自转角速度投影到n系 */
+    # projection of the angular velocity of Earth rotation onto the NED frame
     @staticmethod
     def iewn(lat: float):
         return np.array([Earth.WGS84_WIE * np.cos(lat), 0, -Earth.WGS84_WIE * np.sin(lat)])
@@ -199,7 +199,7 @@ class Earth:
         Global = Earth.local2global(origin, local)
         return Earth.iewn(Global[0])
 
-    # /* n系相对于e系转动角速度投影到n系 */
+    # projection of angular velocity of NED frame relative to the ECEF frame onto the NED frame.
     @staticmethod
     def enwn(rmn_or_origin: np.ndarray, blh_or_local: np.ndarray, vel_or_vel: np.ndarray):
         if len(rmn_or_origin) == 2:  # Assumes rmn is provided
@@ -222,16 +222,4 @@ class Earth:
             -vel[0] / (rmn[0] + blh[2]),
             -vel[1] * np.tan(blh[0]) / (rmn[1] + blh[2])
         ])
-
-
-    # @ staticmethod
-    # def enwn(rmn: np.ndarray, blh: np.ndarray, vel: np.ndarray):
-    #     return np.array([vel[1] / (rmn[1] + blh[2]), -vel[0] / (rmn[0] + blh[2]), -vel[1] * np.tan(blh[0]) / (rmn[1] + blh[2])])
-    #
-    # @staticmethod
-    # def enwn(origin: np.ndarray, local: np.ndarray, vel: np.ndarray):
-    #     Global = Earth.local2global(origin, local)
-    #     rmn = Earth.meridianPrimeVerticalRadius(Global[0])
-    #
-    #     return Earth.enwn(rmn, Global, vel)
 

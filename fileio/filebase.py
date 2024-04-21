@@ -1,5 +1,5 @@
-import io
 import os
+
 
 class FileBase:
     TEXT = 0
@@ -10,30 +10,26 @@ class FileBase:
         self.filetype_ = self.TEXT
         self.columns_ = 0
 
+    # close file
     def close(self):
         if self.filefp_ and not self.filefp_.closed:
             self.filefp_.close()
             self.filefp_ = None
 
+    # check if open
     def isOpen(self):
         return self.filefp_ is not None and not self.filefp_.closed
 
+    # check end of lines
     def isEof(self):
         if self.filefp_ and not self.filefp_.closed:
             return self.filefp_.tell() == os.fstat(self.filefp_.fileno()).st_size
         return True
 
+    # return file - original name kept to keep integrity of porting
     def fstream(self):
         return self.filefp_
 
+    # return column number
     def columns(self):
         return self.columns_
-
-# Example usage:
-# if __name__ == "__main__":
-#     fb = FileBase()
-#     # Open a file (example.txt in read mode)
-#     fb.file = open('dataset/truth.nav', 'r')
-#     print(fb.isOpen())  # Check if file is open
-#     print(fb.isEof())   # Check if EOF is reached
-#     fb.close()           # Close the file

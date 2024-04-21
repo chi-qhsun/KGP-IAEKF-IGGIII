@@ -44,6 +44,7 @@ class GINSOptions:
         self.initstate_std = NavState()
         self.imunoise = ImuNoise()
         self.antlever = np.zeros((3,))
+        self.kgp_status = False
 
     def print_options(self):
         print("---------------KF-GINS Options:---------------")

@@ -1,13 +1,12 @@
 import math
 import numpy as np
 
-
 class Angle:
 
     D2R = (math.pi / 180.0)
     R2D = (180.0 / math.pi)
 
-    # original both float and double
+    # radian - degree conversion
     @staticmethod
     def rad2deg(rad: float):
         return rad * Angle.R2D

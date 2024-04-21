@@ -1,7 +1,4 @@
-import sys
-
 import numpy as np
-from absl import logging
 import matplotlib.pyplot as plt
 import time
 
@@ -14,12 +11,7 @@ from fileio.filesaver import *
 from kf_gins.gi_engine import *
 
 def main():
-    # --------------------------------------------------------------------------------------------- open files
-    # if len(argv) != 2:
-    #     print("usage: python script.py kf-gins-real.yaml")
-    #     sys.exit(-1)
-
-    print("\nKF-GINS: An EKF-Based GNSS/INS Integrated Navigation System\n")
+    print("\nKGP-IAEKF-IGGIII Loose Coupling EKF Navigation System, Based on KF-GINS by i2Nav Lab, Wuhan University\n")
     ts = time.time()
 
     # Load configuration file
@@ -31,7 +23,6 @@ def main():
         sys.exit(-1)
 
     # Read configuration parameters into GINSOptions and construct GIEngine
-    # options = GINSOptions()
     judge, opt = loadConfig(config)
     if not judge:
         print("Error occurs in the configuration file!")
@@ -73,7 +64,7 @@ def main():
     stdfile = FileSaver(outputpath + "/KF_GINS_STD.txt", std_columns, FileSaver.TEXT)
 
     # Check if files are opened
-    if not (gnssfile.isOpen() and imufile.isOpen() ): # and navfile.isOpen() and imuerrfile.isOpen() and stdfile.isOpen()
+    if not (gnssfile.isOpen() and imufile.isOpen() ):
         print("Failed to open data file!")
         sys.exit(-1)
 
@@ -81,7 +72,7 @@ def main():
     if endtime < 0:
         endtime = imufile.endtime()
     if endtime > 604800 or starttime < imufile.starttime() or starttime > endtime:
-        # print('end time is: ',endtime)
+        print('end time is: ',endtime)
         print("Process time ERROR!")
         sys.exit(-1)
 
@@ -137,9 +128,7 @@ def main():
         giengine.addImuData(imu_cur)
 
         # Process new imudata
-        # print('pvacru_ pos before newimuprocess:', giengine.pvacur_.pos * Angle.R2D, giengine.pvapre_.pos * Angle.R2D)
         giengine.newImuProcess()
-        # print('pvacru_ pos after newimuprocess:', giengine.pvacur_.pos * Angle.R2D, giengine.pvapre_.pos * Angle.R2D)
 
         # Get current timestamp, navigation state, and covariance
         timestamp = giengine.timestamp()
@@ -187,14 +176,11 @@ def main():
 
 
 def loadConfig(config):
-    """
-    Load initial states of GIEngine from configuration file and convert them to standard units.
-    """
+
+    # Load initial states of GIEngine from configuration file and convert them to standard units.
+
     # Constants for unit conversions
     D2R = Angle.D2R
-
-    # initstate = NavState()
-    # initstate_std = NavState()
 
     options = GINSOptions()
     # Load initial position, velocity, and attitude from configuration file
@@ -242,8 +228,6 @@ def loadConfig(config):
         options.initstate_std.pos[i] = vec1[i]
         options.initstate_std.vel[i] = vec2[i]
         options.initstate_std.euler[i] = vec3[i] * D2R
-
-
 
     # Load IMU noise parameters from configuration file
     try:
@@ -310,14 +294,23 @@ def loadConfig(config):
         print("Failed when loading configuration. Please check antenna leverarm!")
         return False
 
-
     options.antlever = np.array(vec1)
+
+    try:
+        kgp_status = config["KGP"]
+    except KeyError:
+        print("Failed when loading configuration. Please check KGP set to True or False")
+        sys.exit(-1)
+
+    options.kgp_status = kgp_status
+
     return True, options
 
+
 def writeNavResult(time: float, navstate: NavState, navfile: FileSaver, imuerrfile: FileSaver):
-    """
-    Save navigation result and IMU error.
-    """
+
+    # Save navigation result and IMU error.
+
     # Constants for unit conversions
     R2D = Angle.R2D
 
@@ -358,9 +351,9 @@ def writeNavResult(time: float, navstate: NavState, navfile: FileSaver, imuerrfi
     imuerrfile.dump(result)
 
 def writeSTD(time, cov, stdfile):
-    """
-    Save standard deviation, converted to common units.
-    """
+
+    # Save standard deviation, converted to common units.
+
     # Constants for unit conversions
     R2D = Angle.R2D
 
@@ -387,5 +380,4 @@ def writeSTD(time, cov, stdfile):
 
 
 if __name__ == '__main__':
-    # app.run(main)
     main()

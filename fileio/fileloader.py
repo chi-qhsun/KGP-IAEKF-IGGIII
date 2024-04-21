@@ -1,4 +1,3 @@
-import os
 from .filebase import *
 
 
@@ -6,7 +5,6 @@ class FileLoader(FileBase):
 
     def __init__(self, filename=None, columns=None, filetype=FileBase.TEXT):
         super().__init__()
-        # print(self.filefp_,'',self.TEXT,'',self.filetype_)
         self.data_ = None
         self.open(filename, columns, filetype)
 
@@ -22,10 +20,12 @@ class FileLoader(FileBase):
             print("File could not be opened")
             return False
 
+    # load file
     def load(self):
         self.load_()
         return self.data_
 
+    # load multiple cycles
     def loadn(self, epochs):
         for _ in range(epochs):
             if self.load_():
@@ -34,18 +34,7 @@ class FileLoader(FileBase):
                 break
         return self.data_
 
-    def load_single(self):
-        return self.load_()
-
-    def load_multiple(self, epochs):
-        for _ in range(epochs):
-            if self.load_():
-                self.data_.append(self.data_)
-            else:
-                return self.data_
-        return True
-
-
+    # load file
     def load_(self):
         if self.isEof():
             return False
@@ -55,7 +44,7 @@ class FileLoader(FileBase):
             if not line:
                 return False
 
-            # Skipping whitespace and splitting by any combination of comma and whitespace
+            # split by whitespace
             splits = [x.strip() for x in line.split(" ") if x.strip()]
 
             self.data_ = [float(val) for val in splits]
@@ -63,19 +52,10 @@ class FileLoader(FileBase):
                 raise ValueError("Number of columns does not match data")
 
         else:
-            # import struct
-            # data_bytes = self.filefp_.read(self.columns_ * 8)  # assuming double precision
-            # if not data_bytes:
-            #     return None
-            # self.data_ = struct.unpack('d' * self.columns_, data_bytes)
+            # don't care about none txt
             pass
 
         return True
 
-# Example usage
-if __name__ == "__main__":
-    loader = FileLoader('dataset/GNSS-RTK.txt', 7, FileBase.TEXT)
-    print(loader.load())
-    loader.close()
 
 

@@ -11,6 +11,7 @@ class ImuFileLoader(FileLoader):
         self.imu_ = IMU()
         self.imu_pre_ = IMU()
 
+    # iterate IMU data
     def next(self):
 
         self.imu_pre_.time = self.imu_.time
@@ -22,13 +23,10 @@ class ImuFileLoader(FileLoader):
         self.data_ = self.load()
 
         self.imu_.time = self.data_[0]
-        # print(self.imu_.time)
-        # print(self.imu_pre_.time)
         self.imu_.dtheta = np.array(self.data_[1:4])
         self.imu_.dvel = np.array(self.data_[4:7])
 
         dt = self.imu_.time - self.imu_pre_.time
-        # print(dt)
         if dt < 0.1:
             self.imu_.dt = dt
         else:
@@ -59,14 +57,3 @@ class ImuFileLoader(FileLoader):
         end_time = float(last_line.split(' ')[0])
         self.filefp_.seek(initial_pos)
         return end_time
-
-
-# Example usage:
-# if __name__ == "__main__":
-#     loader = ImuFileLoader('dataset/Leador-A15.txt', 7)
-#     # print(loader.starttime())
-#     # print(loader.endtime())
-#     imu_data = loader.next()
-#     print(imu_data.time, imu_data.dtheta, imu_data.dvel, imu_data.dt, imu_data.odovel)
-#     imu_data = loader.next()
-#     print(imu_data.time, imu_data.dtheta, imu_data.dvel, imu_data.dt, imu_data.odovel)

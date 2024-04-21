@@ -1,7 +1,7 @@
 imupath: "dataset/Leador-A15.txt"
 gnsspath: "dataset/GNSS-RTK.txt"
 
-outputpath: "new"
+outputpath: "NavResult"
 
 imudatalen: 7
 
@@ -40,3 +40,5 @@ imunoise:
   corrtime: 4.0
 
 antlever:  [ 0.136, -0.301, -0.184 ]
+
+KGP: True

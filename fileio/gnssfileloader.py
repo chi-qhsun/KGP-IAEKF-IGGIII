@@ -1,6 +1,3 @@
-#include "common/types.h"
-#include "fileloader.h"
-
 from common.angle import *
 from common.types import *
 from .fileloader import *
