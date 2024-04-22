@@ -1,17 +1,16 @@
-# KF-GINS-KGP-IAEFKF-IGGIII
+# KGP-IAEFKF-IGGIII
 
-## An EKF-Based GNSS/INS Integrated Loose Coupling Navigation System
+## Loose Coupling of GNSS/INS Using IA-EKF, IGGIII and KGP Methods Based on KF-GINS 
 
 ## Introduction
 
+This paper expands on prior research by integratingcutting-edge adaptive algorithms, including IAE-KF, IGGIII, and KGP. This ensures increased accuracy and resilience in loosely connected GNSS/INS systems to improve estimate procedures and handle dynamic noise and non-linearities.
 
+We also ported existed EKF integrated GNSS/INS navigation system: [KF-GINS](https://github.com/i2Nav-WHU/KF-GINS/) from C++ to Python for further development of Machine Learning Algorithm.
 **Related Reference:**
 
 - X. Niu, Q. Chen, "[Notes for GNSS/INS Integrated Navigation and Principles of IMU Navigation](http://www.i2nav.com/index/newListDetail_zw.do?newskind_id=13a8654e060c40c69e5f3d4c13069078&newsinfo_id=40f3c65b158742c099ba3b600c983aa1)", i2Nav Lab, GNSS Research Center, Wuhan University, 2022
 - X. Niu, Q. Chen, "[Lecture Recordings for GNSS/INS Integrated Navigation and Principles of IMU Navigation](https://www.bilibili.com/video/BV1na411Z7rQ?spm_id_from=333.999.0.0&vd_source=a417ebe0768fc96919fe8e34c55ed591)", i2Nav Lab, GNSS Research Center, Wuhan University， 2022
-- X. Niu, Q. Zhang, L. Gong, C. Liu, H. Zhang, C. Shi, J. Wang and M. Coleman (2014). "Development and evaluation of GNSS/INS data processing software for position and orientation systems." Survey Review 2014; 47(341), 87-98.
-- 严恭敏, 翁浚, 捷联惯导算法与组合导航原理. 西北工业大学出版社, 2019.
-
 
 ## 1 Program Compilation and Execution
 
@@ -50,7 +49,6 @@ After setting your configuration, open Main.py in the folder,click run:
 The Application will automatically run and generate result in expexted directory. 
 
 Default path: ./NavResult
-```
 
 ## 2 Use KGP-IAEKF-IGGIII
 
@@ -75,6 +73,7 @@ For more details on the algorithm, please refer to [Notes for GNSS/INS Integrate
 ### 2.2 Data format
 
 **Input Data**
+
 - The IMU text file format is defined as:
 
 | Columns | Data description         | Units |
@@ -94,6 +93,7 @@ For more details on the algorithm, please refer to [Notes for GNSS/INS Integrate
 | 5~7     | position STD (north-east-down) | $m$   |
 
 **Output Data**
+
 - The text file format of the navigation result and the ground-truth is defined as:
 
 | Columns | Data description                | Units |
