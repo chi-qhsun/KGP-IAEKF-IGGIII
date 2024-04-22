@@ -29,15 +29,15 @@ conda create --name kgp-IAEKF python=3.8
 conda activate kgp-IAEKF
 conda install -c conda-forge absl-py pyswarm scikit-learn pyyaml pyquaternion
 ```
-absl-py: A library from Google providing application-level infrastructure and various Python utilities.
+**absl-py**: A library from Google providing application-level infrastructure and various Python utilities.
 
-pyswarm: A particle swarm optimization (PSO) library.
+**pyswarm**: A particle swarm optimization (PSO) library.
 
-scikit-learn: A powerful Python module for machine learning and data mining.
+**scikit-learn**: A powerful Python module for machine learning and data mining.
 
-pyyaml: A library for YAML file parsing and output.
+**pyyaml**: A library for YAML file parsing and output.
 
-pyquaternion: A library for handling rotations in three-dimensional space using quaternions.
+**pyquaternion**: A library for handling rotations in three-dimensional space using quaternions.
 
 ### 1.2 Compile under Windows
 
