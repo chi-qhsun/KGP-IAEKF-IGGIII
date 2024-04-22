@@ -7,7 +7,8 @@
 This paper expands on prior research by integratingcutting-edge adaptive algorithms, including IAE-KF, IGGIII, and KGP. This ensures increased accuracy and resilience in loosely connected GNSS/INS systems to improve estimate procedures and handle dynamic noise and non-linearities.
 
 We also ported existed EKF integrated GNSS/INS navigation system: [KF-GINS](https://github.com/i2Nav-WHU/KF-GINS/) from C++ to Python for further development of Machine Learning Algorithm.
-**Related Reference:**
+
+**Related Reference for KF-GINS:**
 
 - X. Niu, Q. Chen, "[Notes for GNSS/INS Integrated Navigation and Principles of IMU Navigation](http://www.i2nav.com/index/newListDetail_zw.do?newskind_id=13a8654e060c40c69e5f3d4c13069078&newsinfo_id=40f3c65b158742c099ba3b600c983aa1)", i2Nav Lab, GNSS Research Center, Wuhan University, 2022
 - X. Niu, Q. Chen, "[Lecture Recordings for GNSS/INS Integrated Navigation and Principles of IMU Navigation](https://www.bilibili.com/video/BV1na411Z7rQ?spm_id_from=333.999.0.0&vd_source=a417ebe0768fc96919fe8e34c55ed591)", i2Nav Lab, GNSS Research Center, Wuhan University， 2022
@@ -135,7 +136,7 @@ KF-GINS only supports initial alignment given all initial states currently. The 
 
 ## 3 Activate KGP
 
-Please set configuration KGP to [[True]], if KGP prediction is needed.
+Please set configuration KGP to **True**, if KGP prediction is needed.
 
 ## 4 Datasets
 
